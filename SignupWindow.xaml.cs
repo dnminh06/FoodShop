@@ -31,6 +31,14 @@ namespace FoodOrderWPF
                 return;
             }
 
+            if (!Regex.IsMatch(fullName, @"^[\p{L}\s]{2,100}$"))
+            {
+                MessageBox.Show("Họ và tên không hợp lệ! Vui lòng chỉ nhập chữ cái (2 - 100 ký tự), không chứa số hoặc ký tự đặc biệt.", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtFullName.Focus();
+                return;
+            }
+
             if (!Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase))
             {
                 MessageBox.Show("Định dạng Email không hợp lệ! (VD: example@gmail.com)", "Dữ liệu không hợp lệ",

@@ -1289,6 +1289,11 @@ namespace FoodOrderWPF
             cboUserRole.SelectedIndex = 0;
         }
 
+        private static bool IsValidFullName(string fullName)
+        {
+            return Regex.IsMatch(fullName, @"^[\p{L}\s]{2,100}$");
+        }
+
         private static bool IsValidEmail(string email)
         {
             return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase);
@@ -1299,8 +1304,16 @@ namespace FoodOrderWPF
             return Regex.IsMatch(phone, @"^0\d{9}$");
         }
 
-        private bool TryValidateEmailAndPhone(string email, string phone, TextBox emailBox, TextBox phoneBox)
+        private bool TryValidateEmailAndPhone(string fullName, string email, string phone, TextBox fullNameBox, TextBox emailBox, TextBox phoneBox)
         {
+            if (!IsValidFullName(fullName))
+            {
+                MessageBox.Show("Họ và tên không hợp lệ! Vui lòng chỉ nhập chữ cái (2 - 100 ký tự), không chứa số hoặc ký tự đặc biệt.", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                fullNameBox.Focus();
+                return false;
+            }
+
             if (!IsValidEmail(email))
             {
                 MessageBox.Show("Định dạng Email không hợp lệ! (VD: example@gmail.com)", "Dữ liệu không hợp lệ",
@@ -1335,7 +1348,7 @@ namespace FoodOrderWPF
                 return;
             }
 
-            if (!TryValidateEmailAndPhone(email, phone, txtUserEmail, txtUserPhone))
+            if (!TryValidateEmailAndPhone(fullName, email, phone, txtUserFullName, txtUserEmail, txtUserPhone))
                 return;
 
             try
@@ -1395,7 +1408,7 @@ namespace FoodOrderWPF
                 return;
             }
 
-            if (!TryValidateEmailAndPhone(email, phone, txtUserEmail, txtUserPhone))
+            if (!TryValidateEmailAndPhone(fullName, email, phone, txtUserFullName, txtUserEmail, txtUserPhone))
                 return;
 
             try
@@ -1510,7 +1523,7 @@ namespace FoodOrderWPF
                 return;
             }
 
-            if (!TryValidateEmailAndPhone(email, phone, txtProfileEmail, txtProfilePhone))
+            if (!TryValidateEmailAndPhone(fullName, email, phone, txtProfileFullName, txtProfileEmail, txtProfilePhone))
                 return;
 
             try
