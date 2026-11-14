@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using FoodOrderWPF.Models;
 
@@ -22,6 +23,14 @@ namespace FoodOrderWPF
             {
                 MessageBox.Show("Vui lòng nhập đầy đủ Email và Password!", "Thông báo",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase))
+            {
+                MessageBox.Show("Định dạng Email không hợp lệ! (VD: example@gmail.com)", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtEmail.Focus();
                 return;
             }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using FoodOrderWPF.Models;
@@ -37,6 +38,7 @@ namespace FoodOrderWPF
                 if (_currentUser.RoleId == 4 || _currentUser.RoleId == 2)
                 {
                     LoadManageProducts();
+                    LoadManageVouchers();
                 }
 
                 if (_currentUser.RoleId == 4 || _currentUser.RoleId == 2 || _currentUser.RoleId == 3)
@@ -47,6 +49,7 @@ namespace FoodOrderWPF
                 if (_currentUser.RoleId == 4)
                 {
                     LoadManageUsers();
+                    LoadRevenueStats();
                 }
             }
 
@@ -63,7 +66,9 @@ namespace FoodOrderWPF
                 tabMyOrders.Visibility = Visibility.Collapsed;
                 tabManageProduct.Visibility = Visibility.Collapsed;
                 tabManageOrder.Visibility = Visibility.Collapsed;
+                tabManageVoucher.Visibility = Visibility.Collapsed;
                 tabManageUser.Visibility = Visibility.Collapsed;
+                tabRevenue.Visibility = Visibility.Collapsed;
                 tabProfile.Visibility = Visibility.Collapsed;
             }
             else
@@ -82,7 +87,15 @@ namespace FoodOrderWPF
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
+                tabManageVoucher.Visibility = (_currentUser.RoleId == 4 || _currentUser.RoleId == 2)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
                 tabManageUser.Visibility = _currentUser.RoleId == 4
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+                tabRevenue.Visibility = _currentUser.RoleId == 4
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
@@ -111,6 +124,14 @@ namespace FoodOrderWPF
             else if (mainTabControl.SelectedItem == tabManageOrder)
             {
                 LoadManageOrders();
+            }
+            else if (mainTabControl.SelectedItem == tabManageVoucher)
+            {
+                LoadManageVouchers();
+            }
+            else if (mainTabControl.SelectedItem == tabRevenue)
+            {
+                LoadRevenueStats();
             }
         }
 
@@ -885,6 +906,348 @@ namespace FoodOrderWPF
             LoadManageOrders();
         }
 
+        private void LoadManageVouchers()
+        {
+            try
+            {
+                using var db = new FoodOrderDbContext();
+                dgManageVouchers.ItemsSource = db.Vouchers
+                    .AsNoTracking()
+                    .OrderBy(v => v.VoucherId)
+                    .ToList();
+
+                if (!dpVoucherStartDate.SelectedDate.HasValue)
+                {
+                    dpVoucherStartDate.SelectedDate = DateTime.Today;
+                }
+                if (!dpVoucherEndDate.SelectedDate.HasValue)
+                {
+                    dpVoucherEndDate.SelectedDate = DateTime.Today.AddMonths(1);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi tải danh sách Voucher: " + ex.Message, "Lỗi",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void dgManageVouchers_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (dgManageVouchers.SelectedItem is Voucher voucher)
+            {
+                txtVoucherId.Text = voucher.VoucherId.ToString();
+                txtVoucherCode.Text = voucher.VoucherCode;
+                txtVoucherDiscountPercent.Text = voucher.DiscountPercent.ToString("0.##");
+                txtVoucherMaxDiscount.Text = voucher.MaxDiscountAmount.HasValue
+                    ? voucher.MaxDiscountAmount.Value.ToString("0.##")
+                    : string.Empty;
+                dpVoucherStartDate.SelectedDate = voucher.StartDate.Date;
+                dpVoucherEndDate.SelectedDate = voucher.EndDate.Date;
+            }
+        }
+
+        private void btnClearVoucherForm_Click(object sender, RoutedEventArgs e)
+        {
+            dgManageVouchers.SelectedItem = null;
+            txtVoucherId.Text = string.Empty;
+            txtVoucherCode.Text = string.Empty;
+            txtVoucherDiscountPercent.Text = string.Empty;
+            txtVoucherMaxDiscount.Text = string.Empty;
+            dpVoucherStartDate.SelectedDate = DateTime.Today;
+            dpVoucherEndDate.SelectedDate = DateTime.Today.AddMonths(1);
+        }
+
+        private void btnAddVoucher_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryValidateVoucherInputs(out string code, out decimal discountPercent, out decimal? maxDiscount, out DateTime startDate, out DateTime endDate))
+                return;
+
+            try
+            {
+                using var db = new FoodOrderDbContext();
+                if (db.Vouchers.Any(v => v.VoucherCode == code))
+                {
+                    MessageBox.Show("Mã Voucher này đã tồn tại!", "Trùng mã Voucher",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var newVoucher = new Voucher
+                {
+                    VoucherCode = code,
+                    DiscountPercent = discountPercent,
+                    MaxDiscountAmount = maxDiscount,
+                    StartDate = startDate,
+                    EndDate = endDate
+                };
+
+                db.Vouchers.Add(newVoucher);
+                db.SaveChanges();
+
+                LoadManageVouchers();
+                LoadVouchers();
+                btnClearVoucherForm_Click(sender, e);
+
+                MessageBox.Show("Thêm Voucher mới thành công!", "Thành công",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi thêm Voucher:\n" + ex.Message, "Lỗi",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void btnUpdateVoucher_Click(object sender, RoutedEventArgs e)
+        {
+            if (!int.TryParse(txtVoucherId.Text, out int voucherId))
+            {
+                MessageBox.Show("Vui lòng chọn 1 Voucher trong bảng để cập nhật!", "Thông báo",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!TryValidateVoucherInputs(out string code, out decimal discountPercent, out decimal? maxDiscount, out DateTime startDate, out DateTime endDate))
+                return;
+
+            try
+            {
+                using var db = new FoodOrderDbContext();
+                if (db.Vouchers.Any(v => v.VoucherCode == code && v.VoucherId != voucherId))
+                {
+                    MessageBox.Show("Mã Voucher này đã được sử dụng cho Voucher khác!", "Trùng mã Voucher",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var voucher = db.Vouchers.FirstOrDefault(v => v.VoucherId == voucherId);
+                if (voucher == null)
+                {
+                    MessageBox.Show("Không tìm thấy Voucher này trong CSDL!", "Lỗi",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                voucher.VoucherCode = code;
+                voucher.DiscountPercent = discountPercent;
+                voucher.MaxDiscountAmount = maxDiscount;
+                voucher.StartDate = startDate;
+                voucher.EndDate = endDate;
+
+                db.SaveChanges();
+
+                LoadManageVouchers();
+                LoadVouchers();
+                MessageBox.Show("Cập nhật Voucher thành công!", "Thành công",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi cập nhật Voucher:\n" + ex.Message, "Lỗi",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void btnDeleteVoucher_Click(object sender, RoutedEventArgs e)
+        {
+            if (!int.TryParse(txtVoucherId.Text, out int voucherId))
+            {
+                MessageBox.Show("Vui lòng chọn 1 Voucher trong bảng để xóa!", "Thông báo",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"Bạn có chắc chắn muốn xóa Voucher ID #{voucherId} ({txtVoucherCode.Text}) không?",
+                "Xác nhận xóa Voucher",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                using var db = new FoodOrderDbContext();
+                db.Database.ExecuteSqlInterpolated($"UPDATE Orders SET voucherID = NULL WHERE voucherID = {voucherId}");
+                db.Vouchers.Where(v => v.VoucherId == voucherId).ExecuteDelete();
+
+                LoadManageVouchers();
+                LoadVouchers();
+                LoadMyOrders();
+                LoadManageOrders();
+                btnClearVoucherForm_Click(sender, e);
+
+                MessageBox.Show("Xóa Voucher thành công!", "Thành công",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi xóa Voucher:\n" + ex.Message, "Lỗi",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private bool TryValidateVoucherInputs(out string code, out decimal discountPercent, out decimal? maxDiscount, out DateTime startDate, out DateTime endDate)
+        {
+            code = txtVoucherCode.Text.Trim().ToUpper();
+            discountPercent = 0;
+            maxDiscount = null;
+            startDate = DateTime.Today;
+            endDate = DateTime.Today;
+
+            if (string.IsNullOrEmpty(code))
+            {
+                MessageBox.Show("Vui lòng nhập Mã Voucher!", "Thiếu thông tin",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!decimal.TryParse(txtVoucherDiscountPercent.Text.Trim(), out discountPercent) || discountPercent <= 0 || discountPercent > 100)
+            {
+                MessageBox.Show("Phần trăm giảm phải là số lớn hơn 0 và nhỏ hơn hoặc bằng 100!", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            string maxText = txtVoucherMaxDiscount.Text.Trim();
+            if (!string.IsNullOrEmpty(maxText))
+            {
+                if (!decimal.TryParse(maxText, out decimal maxVal) || maxVal < 0)
+                {
+                    MessageBox.Show("Số tiền giảm tối đa phải là số không âm!", "Dữ liệu không hợp lệ",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
+                }
+                maxDiscount = maxVal;
+            }
+
+            if (!dpVoucherStartDate.SelectedDate.HasValue || !dpVoucherEndDate.SelectedDate.HasValue)
+            {
+                MessageBox.Show("Vui lòng chọn Ngày bắt đầu và Ngày kết thúc!", "Thiếu thông tin",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            startDate = dpVoucherStartDate.SelectedDate.Value.Date;
+            endDate = dpVoucherEndDate.SelectedDate.Value.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+
+            if (endDate < startDate)
+            {
+                MessageBox.Show("Ngày kết thúc phải lớn hơn hoặc bằng Ngày bắt đầu!", "Ngày không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            return true;
+        }
+
+        private void LoadRevenueStats()
+        {
+            if (_currentUser == null || _currentUser.RoleId != 4) return;
+
+            try
+            {
+                using var db = new FoodOrderDbContext();
+                var ordersQuery = db.Orders
+                    .Include(o => o.OrderDetails)
+                    .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p!.Restaurant)
+                    .AsNoTracking()
+                    .AsQueryable();
+
+                if (dpRevFromDate.SelectedDate.HasValue)
+                {
+                    DateTime fromDate = dpRevFromDate.SelectedDate.Value.Date;
+                    ordersQuery = ordersQuery.Where(o => o.OrderDate.HasValue && o.OrderDate.Value >= fromDate);
+                }
+
+                if (dpRevToDate.SelectedDate.HasValue)
+                {
+                    DateTime toDateExclusive = dpRevToDate.SelectedDate.Value.Date.AddDays(1);
+                    ordersQuery = ordersQuery.Where(o => o.OrderDate.HasValue && o.OrderDate.Value < toDateExclusive);
+                }
+
+                string statusMode = cboRevStatusFilter.SelectedValue?.ToString() ?? "AllValid";
+                if (statusMode == "CompletedOnly")
+                {
+                    ordersQuery = ordersQuery.Where(o => o.Status == "Completed");
+                }
+                else
+                {
+                    ordersQuery = ordersQuery.Where(o => o.Status != "Cancelled");
+                }
+
+                var filteredOrders = ordersQuery.ToList();
+
+                lblRevTotalOrders.Text = filteredOrders.Count.ToString("N0");
+                lblRevCompletedOrders.Text = filteredOrders.Count(o => o.Status == "Completed").ToString("N0");
+                lblRevTotalItems.Text = filteredOrders.SelectMany(o => o.OrderDetails).Sum(od => od.Quantity).ToString("N0");
+                lblRevTotalRevenue.Text = $"{filteredOrders.Sum(o => o.TotalAmount):N0} đ";
+
+                var byRestaurant = filteredOrders
+                    .SelectMany(o => o.OrderDetails)
+                    .Where(od => od.Product != null)
+                    .GroupBy(od => new
+                    {
+                        od.Product!.RestaurantId,
+                        RestaurantName = od.Product.Restaurant?.Name ?? $"Restaurant #{od.Product.RestaurantId}"
+                    })
+                    .Select(g => new RestaurantRevenueItem
+                    {
+                        RestaurantId = g.Key.RestaurantId,
+                        RestaurantName = g.Key.RestaurantName,
+                        OrderCount = g.Select(x => x.OrderId).Distinct().Count(),
+                        TotalQuantitySold = g.Sum(x => x.Quantity),
+                        TotalRevenue = g.Sum(x => x.SubTotal)
+                    })
+                    .OrderByDescending(x => x.TotalRevenue)
+                    .ToList();
+
+                dgRevenueByRestaurant.ItemsSource = byRestaurant;
+
+                var byDate = filteredOrders
+                    .Where(o => o.OrderDate.HasValue)
+                    .GroupBy(o => o.OrderDate!.Value.Date)
+                    .Select(g => new DailyRevenueItem
+                    {
+                        Date = g.Key,
+                        OrderCount = g.Count(),
+                        TotalRevenue = g.Sum(o => o.TotalAmount)
+                    })
+                    .OrderByDescending(x => x.Date)
+                    .ToList();
+
+                dgRevenueByDate.ItemsSource = byDate;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi thống kê doanh thu:\n" + ex.Message, "Lỗi",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void btnFilterRevenue_Click(object sender, RoutedEventArgs e)
+        {
+            if (dpRevFromDate.SelectedDate.HasValue && dpRevToDate.SelectedDate.HasValue
+                && dpRevToDate.SelectedDate.Value.Date < dpRevFromDate.SelectedDate.Value.Date)
+            {
+                MessageBox.Show("Ngày kết thúc phải lớn hơn hoặc bằng Ngày bắt đầu!", "Khoảng ngày không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            LoadRevenueStats();
+        }
+
+        private void btnResetRevenue_Click(object sender, RoutedEventArgs e)
+        {
+            dpRevFromDate.SelectedDate = null;
+            dpRevToDate.SelectedDate = null;
+            cboRevStatusFilter.SelectedIndex = 0;
+            LoadRevenueStats();
+        }
+
         private void LoadManageUsers()
         {
             try
@@ -926,6 +1289,37 @@ namespace FoodOrderWPF
             cboUserRole.SelectedIndex = 0;
         }
 
+        private static bool IsValidEmail(string email)
+        {
+            return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase);
+        }
+
+        private static bool IsValidPhone(string phone)
+        {
+            return Regex.IsMatch(phone, @"^0\d{9}$");
+        }
+
+        private bool TryValidateEmailAndPhone(string email, string phone, TextBox emailBox, TextBox phoneBox)
+        {
+            if (!IsValidEmail(email))
+            {
+                MessageBox.Show("Định dạng Email không hợp lệ! (VD: example@gmail.com)", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                emailBox.Focus();
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(phone) && !IsValidPhone(phone))
+            {
+                MessageBox.Show("Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số và bắt đầu bằng số 0 (VD: 0901234567).", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                phoneBox.Focus();
+                return false;
+            }
+
+            return true;
+        }
+
         private void btnAddUser_Click(object sender, RoutedEventArgs e)
         {
             string fullName = txtUserFullName.Text.Trim();
@@ -940,6 +1334,9 @@ namespace FoodOrderWPF
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            if (!TryValidateEmailAndPhone(email, phone, txtUserEmail, txtUserPhone))
+                return;
 
             try
             {
@@ -997,6 +1394,9 @@ namespace FoodOrderWPF
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            if (!TryValidateEmailAndPhone(email, phone, txtUserEmail, txtUserPhone))
+                return;
 
             try
             {
@@ -1109,6 +1509,9 @@ namespace FoodOrderWPF
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            if (!TryValidateEmailAndPhone(email, phone, txtProfileEmail, txtProfilePhone))
+                return;
 
             try
             {

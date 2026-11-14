@@ -161,7 +161,6 @@ INSERT INTO dbo.Users ([userID], [fullName], [email], [passwordHash], [phoneNumb
 INSERT INTO dbo.Users ([userID], [fullName], [email], [passwordHash], [phoneNumber], [roleID]) VALUES (30, N'Hoàng Minh Tuấn', N'tuan.hoang@gmail.com', N'hash_pwd_030', N'0935555666', 4);
 INSERT INTO dbo.Users ([userID], [fullName], [email], [passwordHash], [phoneNumber], [roleID]) VALUES (31, N'Đỗ Nhật Minh', N'admin@gmail.com', N'123', N'0999999999', 4);
 INSERT INTO dbo.Users ([userID], [fullName], [email], [passwordHash], [phoneNumber], [roleID]) VALUES (32, N'Đỗ Nhật Nam', N'customer@gmail.com', N'123', N'0988888888', 1);
-INSERT INTO dbo.Users ([userID], [fullName], [email], [passwordHash], [phoneNumber], [roleID]) VALUES (33, N'Đỗ Nhật Quang', N'manager@gmail.com', N'123', N'0977777777', 2);
 INSERT INTO dbo.Users ([userID], [fullName], [email], [passwordHash], [phoneNumber], [roleID]) VALUES (34, N'Đỗ Nhật Si', N'ship@gmail.com', N'123', N'0966666666', 3);
 SET IDENTITY_INSERT dbo.Users OFF;
 GO

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using FoodOrderWPF.Models;
 
@@ -27,6 +28,22 @@ namespace FoodOrderWPF
             {
                 MessageBox.Show("Vui lòng nhập đầy đủ Họ tên, Email và Mật khẩu!", "Thông báo",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase))
+            {
+                MessageBox.Show("Định dạng Email không hợp lệ! (VD: example@gmail.com)", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtEmail.Focus();
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(phone) && !Regex.IsMatch(phone, @"^0\d{9}$"))
+            {
+                MessageBox.Show("Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số và bắt đầu bằng số 0 (VD: 0901234567).", "Dữ liệu không hợp lệ",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtPhone.Focus();
                 return;
             }
 
